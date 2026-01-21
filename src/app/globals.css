@@ -1,26 +1,247 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  /* Custom colors for our potluck theme */
+  --color-primary-50: #fef7ee;
+  --color-primary-100: #fcecd7;
+  --color-primary-200: #f8d5ae;
+  --color-primary-300: #f3b87b;
+  --color-primary-400: #ed9146;
+  --color-primary-500: #e87422;
+  --color-primary-600: #d95a18;
+  --color-primary-700: #b44316;
+  --color-primary-800: #903619;
+  --color-primary-900: #742f18;
+  --color-primary-950: #3e150a;
+  
+  /* Warm accent colors */
+  --color-accent-50: #fdf4f3;
+  --color-accent-100: #fce8e6;
+  --color-accent-200: #fad4d0;
+  --color-accent-300: #f5b5ae;
+  --color-accent-400: #ed8a7e;
+  --color-accent-500: #e15f4f;
+  --color-accent-600: #ce4535;
+  --color-accent-700: #ad3829;
+  --color-accent-800: #8f3226;
+  --color-accent-900: #772f26;
+  --color-accent-950: #40140f;
+  
+  /* Sage green for freshness */
+  --color-sage-50: #f4f7f4;
+  --color-sage-100: #e4ebe4;
+  --color-sage-200: #c9d7ca;
+  --color-sage-300: #a2b9a5;
+  --color-sage-400: #76967a;
+  --color-sage-500: #567a5a;
+  --color-sage-600: #426146;
+  --color-sage-700: #364e39;
+  --color-sage-800: #2d3f2f;
+  --color-sage-900: #263528;
+  --color-sage-950: #121c14;
+  
+  /* Custom fonts */
+  --font-display: 'Playfair Display', serif;
+  --font-body: 'DM Sans', sans-serif;
+  
+  /* Custom animations */
+  --animate-fade-in: fade-in 0.5s ease-out;
+  --animate-slide-up: slide-up 0.5s ease-out;
+  --animate-bounce-in: bounce-in 0.6s ease-out;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@keyframes slide-up {
+  from { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to { 
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
+@keyframes bounce-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+:root {
+  --background: 18 18 18;
+  --foreground: 250 250 250;
+  --card: 28 28 28;
+  --card-foreground: 250 250 250;
+  --popover: 28 28 28;
+  --popover-foreground: 250 250 250;
+  --primary: 232 116 34;
+  --primary-foreground: 255 255 255;
+  --secondary: 45 45 45;
+  --secondary-foreground: 250 250 250;
+  --muted: 45 45 45;
+  --muted-foreground: 163 163 163;
+  --accent: 225 95 79;
+  --accent-foreground: 255 255 255;
+  --destructive: 239 68 68;
+  --destructive-foreground: 255 255 255;
+  --border: 55 55 55;
+  --input: 55 55 55;
+  --ring: 232 116 34;
+  --radius: 0.75rem;
+}
+
+[data-theme="light"] {
+  --background: 255 251 245;
+  --foreground: 28 28 28;
+  --card: 255 255 255;
+  --card-foreground: 28 28 28;
+  --popover: 255 255 255;
+  --popover-foreground: 28 28 28;
+  --primary: 232 116 34;
+  --primary-foreground: 255 255 255;
+  --secondary: 244 240 234;
+  --secondary-foreground: 28 28 28;
+  --muted: 244 240 234;
+  --muted-foreground: 115 115 115;
+  --accent: 225 95 79;
+  --accent-foreground: 255 255 255;
+  --destructive: 239 68 68;
+  --destructive-foreground: 255 255 255;
+  --border: 230 220 205;
+  --input: 230 220 205;
+  --ring: 232 116 34;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+  background: rgb(var(--background));
+  color: rgb(var(--foreground));
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Selection color */
+::selection {
+  background: rgba(232, 116, 34, 0.3);
+  color: inherit;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--secondary));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--muted-foreground));
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(var(--primary));
+}
+
+/* Focus styles */
+*:focus-visible {
+  outline: 2px solid rgb(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Utility classes */
+.text-gradient {
+  background: linear-gradient(135deg, rgb(var(--primary)) 0%, rgb(var(--accent)) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.bg-glass {
+  background: rgba(var(--card), 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.bg-pattern {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e87422' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='4'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Card hover effect */
+.card-hover {
+  transition: all 0.3s ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px -12px rgba(232, 116, 34, 0.15);
+}
+
+/* Button base */
+.btn-base {
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.btn-base:active {
+  transform: scale(0.98);
+}
+
+/* Input focus */
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: rgb(var(--primary));
+  box-shadow: 0 0 0 3px rgba(232, 116, 34, 0.1);
+}
+
+/* Toast animations */
+@keyframes toast-in {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.3s ease-out;
 }
