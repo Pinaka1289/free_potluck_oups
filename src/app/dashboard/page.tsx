@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { DashboardClient } from './DashboardClient'
 
 export const metadata = {
-  title: 'Dashboard | PotluckParty',
+  title: 'Dashboard | PotluckPartys',
   description: 'Manage your potluck events'
 }
 
@@ -18,17 +18,17 @@ export default async function DashboardPage() {
 
   // Fetch user's events
   const { data: events } = await supabase
-    .from('events')
+    .from('potluckpartys_events')
     .select(`
       *,
-      items:items(count)
+      items:potluckpartys_items(count)
     `)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
 
   // Fetch user profile
   const { data: profile } = await supabase
-    .from('profiles')
+    .from('potluckpartys_profiles')
     .select('*')
     .eq('id', user.id)
     .single()

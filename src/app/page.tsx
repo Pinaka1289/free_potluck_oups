@@ -207,7 +207,7 @@ export default function HomePage() {
             className="text-center"
           >
             <h2 className="text-3xl font-bold sm:text-4xl">
-              Why Choose <span className="text-gradient">PotluckParty</span>?
+              Why Choose <span className="text-gradient">PotluckPartys</span>?
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-[rgb(var(--muted-foreground))]">
               We&apos;ve made organizing potlucks as easy as pie (or any other dish you&apos;re bringing!)
@@ -321,7 +321,7 @@ export default function HomePage() {
                 <span className="text-gradient"> Successful Potluck</span>
               </h2>
               <p className="mt-4 text-[rgb(var(--muted-foreground))]">
-                Stop using spreadsheets and group chats to organize your potluck. PotluckParty handles everything in one place.
+                Stop using spreadsheets and group chats to organize your potluck. PotluckPartys handles everything in one place.
               </p>
 
               <ul className="mt-8 space-y-4">

@@ -11,7 +11,7 @@ export async function generateMetadata({ params }: Props) {
   const supabase = await createClient()
   
   const { data: event } = await supabase
-    .from('events')
+    .from('potluckpartys_events')
     .select('title, description')
     .eq('slug', slug)
     .single()
@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: Props) {
   }
 
   return {
-    title: `${event.title} | PotluckParty`,
+    title: `${event.title} | PotluckPartys`,
     description: event.description || 'Join this potluck event and claim what you\'re bringing!',
   }
 }
@@ -33,7 +33,7 @@ export default async function EventPage({ params }: Props) {
   const supabase = await createClient()
   
   const { data: event, error } = await supabase
-    .from('events')
+    .from('potluckpartys_events')
     .select('*')
     .eq('slug', slug)
     .single()
@@ -43,7 +43,7 @@ export default async function EventPage({ params }: Props) {
   }
 
   const { data: items } = await supabase
-    .from('items')
+    .from('potluckpartys_items')
     .select('*')
     .eq('event_id', event.id)
     .order('category', { ascending: true })

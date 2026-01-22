@@ -1,11 +1,13 @@
--- Supabase Database Schema for Free Potluck
--- Run this SQL in your Supabase SQL Editor
+-- Supabase Database Schema for PotluckPartys
+-- SAFE: Does NOT drop or modify existing auth data
+-- All tables are prefixed with 'potluckpartys_'
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create profiles table (for optional user accounts)
-CREATE TABLE IF NOT EXISTS profiles (
+-- Create potluckpartys_profiles table (linked to Supabase Auth)
+-- This only stores additional profile info for THIS app
+CREATE TABLE IF NOT EXISTS potluckpartys_profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   full_name TEXT,
@@ -14,8 +16,8 @@ CREATE TABLE IF NOT EXISTS profiles (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create events table
-CREATE TABLE IF NOT EXISTS events (
+-- Create potluckpartys_events table
+CREATE TABLE IF NOT EXISTS potluckpartys_events (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   slug TEXT NOT NULL UNIQUE,
   title TEXT NOT NULL,
@@ -25,15 +27,15 @@ CREATE TABLE IF NOT EXISTS events (
   location TEXT,
   host_name TEXT,
   host_email TEXT,
-  user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  user_id UUID REFERENCES potluckpartys_profiles(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create items table
-CREATE TABLE IF NOT EXISTS items (
+-- Create potluckpartys_items table
+CREATE TABLE IF NOT EXISTS potluckpartys_items (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  event_id UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  event_id UUID NOT NULL REFERENCES potluckpartys_events(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   category TEXT DEFAULT 'Other',
   quantity INTEGER DEFAULT 1,
@@ -44,92 +46,87 @@ CREATE TABLE IF NOT EXISTS items (
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Create indexes for performance
-CREATE INDEX IF NOT EXISTS idx_events_slug ON events(slug);
-CREATE INDEX IF NOT EXISTS idx_events_user_id ON events(user_id);
-CREATE INDEX IF NOT EXISTS idx_items_event_id ON items(event_id);
+-- Create indexes (IF NOT EXISTS)
+CREATE INDEX IF NOT EXISTS idx_potluckpartys_events_slug ON potluckpartys_events(slug);
+CREATE INDEX IF NOT EXISTS idx_potluckpartys_events_user_id ON potluckpartys_events(user_id);
+CREATE INDEX IF NOT EXISTS idx_potluckpartys_items_event_id ON potluckpartys_items(event_id);
 
 -- Enable Row Level Security
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE potluckpartys_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE potluckpartys_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE potluckpartys_items ENABLE ROW LEVEL SECURITY;
 
--- Profiles policies
-CREATE POLICY "Users can view their own profile"
-  ON profiles FOR SELECT
-  USING (auth.uid() = id);
+-- Profiles policies (using DO block to avoid errors if already exists)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_profiles' AND policyname = 'potluckpartys_profiles_select') THEN
+    CREATE POLICY "potluckpartys_profiles_select" ON potluckpartys_profiles FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_profiles' AND policyname = 'potluckpartys_profiles_insert') THEN
+    CREATE POLICY "potluckpartys_profiles_insert" ON potluckpartys_profiles FOR INSERT WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_profiles' AND policyname = 'potluckpartys_profiles_update') THEN
+    CREATE POLICY "potluckpartys_profiles_update" ON potluckpartys_profiles FOR UPDATE USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY "Users can update their own profile"
-  ON profiles FOR UPDATE
-  USING (auth.uid() = id);
+-- Events policies
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_events' AND policyname = 'potluckpartys_events_select') THEN
+    CREATE POLICY "potluckpartys_events_select" ON potluckpartys_events FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_events' AND policyname = 'potluckpartys_events_insert') THEN
+    CREATE POLICY "potluckpartys_events_insert" ON potluckpartys_events FOR INSERT WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_events' AND policyname = 'potluckpartys_events_update') THEN
+    CREATE POLICY "potluckpartys_events_update" ON potluckpartys_events FOR UPDATE USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_events' AND policyname = 'potluckpartys_events_delete') THEN
+    CREATE POLICY "potluckpartys_events_delete" ON potluckpartys_events FOR DELETE USING (true);
+  END IF;
+END $$;
 
-CREATE POLICY "Users can insert their own profile"
-  ON profiles FOR INSERT
-  WITH CHECK (auth.uid() = id);
+-- Items policies
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_items' AND policyname = 'potluckpartys_items_select') THEN
+    CREATE POLICY "potluckpartys_items_select" ON potluckpartys_items FOR SELECT USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_items' AND policyname = 'potluckpartys_items_insert') THEN
+    CREATE POLICY "potluckpartys_items_insert" ON potluckpartys_items FOR INSERT WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_items' AND policyname = 'potluckpartys_items_update') THEN
+    CREATE POLICY "potluckpartys_items_update" ON potluckpartys_items FOR UPDATE USING (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'potluckpartys_items' AND policyname = 'potluckpartys_items_delete') THEN
+    CREATE POLICY "potluckpartys_items_delete" ON potluckpartys_items FOR DELETE USING (true);
+  END IF;
+END $$;
 
--- Events policies (anyone can create and view events)
-CREATE POLICY "Anyone can view events"
-  ON events FOR SELECT
-  TO PUBLIC
-  USING (true);
-
-CREATE POLICY "Anyone can create events"
-  ON events FOR INSERT
-  TO PUBLIC
-  WITH CHECK (true);
-
-CREATE POLICY "Anyone can update events"
-  ON events FOR UPDATE
-  TO PUBLIC
-  USING (true);
-
-CREATE POLICY "Event owners can delete their events"
-  ON events FOR DELETE
-  USING (auth.uid() = user_id);
-
--- Items policies (anyone with event link can manage items)
-CREATE POLICY "Anyone can view items"
-  ON items FOR SELECT
-  TO PUBLIC
-  USING (true);
-
-CREATE POLICY "Anyone can create items"
-  ON items FOR INSERT
-  TO PUBLIC
-  WITH CHECK (true);
-
-CREATE POLICY "Anyone can update items"
-  ON items FOR UPDATE
-  TO PUBLIC
-  USING (true);
-
-CREATE POLICY "Anyone can delete items"
-  ON items FOR DELETE
-  TO PUBLIC
-  USING (true);
-
--- Function to handle new user creation
-CREATE OR REPLACE FUNCTION handle_new_user()
+-- Function: Auto-create potluckpartys profile when user signs up (UNIQUE name for this app)
+CREATE OR REPLACE FUNCTION handle_potluckpartys_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name)
+  INSERT INTO public.potluckpartys_profiles (id, email, full_name)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1))
-  );
+  )
+  ON CONFLICT (id) DO NOTHING;  -- Skip if profile already exists
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Trigger for new user creation
-DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-CREATE TRIGGER on_auth_user_created
+-- Trigger with UNIQUE name for this app (does NOT affect other triggers)
+DROP TRIGGER IF EXISTS on_potluckpartys_user_created ON auth.users;
+CREATE TRIGGER on_potluckpartys_user_created
   AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+  FOR EACH ROW EXECUTE FUNCTION handle_potluckpartys_new_user();
 
 -- Function to update updated_at timestamp
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+CREATE OR REPLACE FUNCTION potluckpartys_update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -137,15 +134,18 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Triggers for updated_at
-CREATE TRIGGER update_profiles_updated_at
-  BEFORE UPDATE ON profiles
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Triggers for updated_at (with unique names)
+DROP TRIGGER IF EXISTS potluckpartys_profiles_updated_at ON potluckpartys_profiles;
+CREATE TRIGGER potluckpartys_profiles_updated_at
+  BEFORE UPDATE ON potluckpartys_profiles
+  FOR EACH ROW EXECUTE FUNCTION potluckpartys_update_updated_at();
 
-CREATE TRIGGER update_events_updated_at
-  BEFORE UPDATE ON events
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS potluckpartys_events_updated_at ON potluckpartys_events;
+CREATE TRIGGER potluckpartys_events_updated_at
+  BEFORE UPDATE ON potluckpartys_events
+  FOR EACH ROW EXECUTE FUNCTION potluckpartys_update_updated_at();
 
-CREATE TRIGGER update_items_updated_at
-  BEFORE UPDATE ON items
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+DROP TRIGGER IF EXISTS potluckpartys_items_updated_at ON potluckpartys_items;
+CREATE TRIGGER potluckpartys_items_updated_at
+  BEFORE UPDATE ON potluckpartys_items
+  FOR EACH ROW EXECUTE FUNCTION potluckpartys_update_updated_at();

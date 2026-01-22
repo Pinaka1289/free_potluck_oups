@@ -9,7 +9,7 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      events: {
+      potluckpartys_events: {
         Row: {
           id: string
           slug: string
@@ -53,7 +53,7 @@ export interface Database {
           updated_at?: string
         }
       }
-      items: {
+      potluckpartys_items: {
         Row: {
           id: string
           event_id: string
@@ -91,7 +91,7 @@ export interface Database {
           updated_at?: string
         }
       }
-      profiles: {
+      potluckpartys_profiles: {
         Row: {
           id: string
           email: string
@@ -130,14 +130,14 @@ export interface Database {
   }
 }
 
-export type Event = Database['public']['Tables']['events']['Row']
-export type EventInsert = Database['public']['Tables']['events']['Insert']
-export type EventUpdate = Database['public']['Tables']['events']['Update']
+export type Event = Database['public']['Tables']['potluckpartys_events']['Row']
+export type EventInsert = Database['public']['Tables']['potluckpartys_events']['Insert']
+export type EventUpdate = Database['public']['Tables']['potluckpartys_events']['Update']
 
-export type Item = Database['public']['Tables']['items']['Row']
-export type ItemInsert = Database['public']['Tables']['items']['Insert']
-export type ItemUpdate = Database['public']['Tables']['items']['Update']
+export type Item = Database['public']['Tables']['potluckpartys_items']['Row']
+export type ItemInsert = Database['public']['Tables']['potluckpartys_items']['Insert']
+export type ItemUpdate = Database['public']['Tables']['potluckpartys_items']['Update']
 
-export type Profile = Database['public']['Tables']['profiles']['Row']
-export type ProfileInsert = Database['public']['Tables']['profiles']['Insert']
-export type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
+export type Profile = Database['public']['Tables']['potluckpartys_profiles']['Row']
+export type ProfileInsert = Database['public']['Tables']['potluckpartys_profiles']['Insert']
+export type ProfileUpdate = Database['public']['Tables']['potluckpartys_profiles']['Update']

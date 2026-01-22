@@ -17,7 +17,7 @@ export function Footer() {
                 <ChefHat className="h-5 w-5 text-white" />
               </div>
               <span className="text-xl font-bold text-[rgb(var(--foreground))]">
-                Potluck<span className="text-[rgb(var(--primary))]">Party</span>
+                Potluck<span className="text-[rgb(var(--primary))]">Partys</span>
               </span>
             </Link>
             <p className="mt-4 max-w-md text-sm text-[rgb(var(--muted-foreground))]">
@@ -114,7 +114,7 @@ export function Footer() {
             </a>
           </div>
           <p className="text-sm text-[rgb(var(--muted-foreground))]">
-            © {currentYear} PotluckParty. All rights reserved.
+            © {currentYear} PotluckPartys. All rights reserved.
           </p>
         </div>
       </div>

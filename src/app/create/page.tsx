@@ -55,11 +55,25 @@ export default function CreateEventPage() {
     try {
       const slug = generateSlug()
       
-      // Check if user is logged in
+      // Check if user is logged in and has a profile
       const { data: { user } } = await supabase.auth.getUser()
       
+      let userId = null
+      if (user) {
+        // Check if user has a profile (foreign key constraint)
+        const { data: profile } = await supabase
+          .from('potluckpartys_profiles')
+          .select('id')
+          .eq('id', user.id)
+          .single()
+        
+        if (profile) {
+          userId = user.id
+        }
+      }
+      
       const { error } = await supabase
-        .from('events')
+        .from('potluckpartys_events')
         .insert({
           slug,
           title: formData.title,
@@ -69,18 +83,24 @@ export default function CreateEventPage() {
           location: formData.location || null,
           host_name: formData.host_name || null,
           host_email: formData.host_email || null,
-          user_id: user?.id || null
+          user_id: userId
         })
 
       if (error) {
-        throw error
+        console.error('Supabase error details:', {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint
+        })
+        throw new Error(error.message || 'Database error')
       }
 
       showToast('Event created successfully!', 'success')
       router.push(`/event/${slug}`)
     } catch (error) {
-      console.error('Error creating event:', error)
-      showToast('Failed to create event. Please try again.', 'error')
+      console.error('Error creating event:', error instanceof Error ? error.message : error)
+      showToast(error instanceof Error ? error.message : 'Failed to create event. Please try again.', 'error')
     } finally {
       setLoading(false)
     }

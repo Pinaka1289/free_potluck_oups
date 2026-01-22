@@ -6,12 +6,17 @@ import { Footer } from '@/components/layout/Footer'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'PotluckParty - Free Potluck Event Organizer',
+  title: 'PotluckPartys - Free Potluck Event Organizer',
   description: 'Create and organize potluck events for free. No sign-up required! Share links with guests and let everyone contribute to the feast.',
   keywords: ['potluck', 'event', 'party', 'food', 'organizer', 'free'],
-  authors: [{ name: 'PotluckParty' }],
+  authors: [{ name: 'PotluckPartys' }],
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
   openGraph: {
-    title: 'PotluckParty - Free Potluck Event Organizer',
+    title: 'PotluckPartys - Free Potluck Event Organizer',
     description: 'Create and organize potluck events for free. No sign-up required!',
     type: 'website',
   },

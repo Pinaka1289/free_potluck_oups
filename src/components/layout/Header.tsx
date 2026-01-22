@@ -72,7 +72,7 @@ export function Header() {
               <ChefHat className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-bold text-[rgb(var(--foreground))]">
-              Potluck<span className="text-[rgb(var(--primary))]">Party</span>
+              Potluck<span className="text-[rgb(var(--primary))]">Partys</span>
             </span>
           </Link>
 

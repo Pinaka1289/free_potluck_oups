@@ -6,20 +6,37 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "cucumber-js",
+    "test:report": "cucumber-js --format html:tests/reports/cucumber-report.html",
+    "test:tag": "cucumber-js --tags",
+    "test:dry": "cucumber-js --dry-run",
+    "test:headed": "HEADLESS=false cucumber-js"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.8.0",
+    "@supabase/supabase-js": "^2.91.0",
+    "date-fns": "^4.1.0",
+    "framer-motion": "^12.27.5",
+    "lucide-react": "^0.562.0",
+    "nanoid": "^5.1.6",
     "next": "16.1.4",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@cucumber/cucumber": "^12.5.0",
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/uuid": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.4",
+    "playwright": "^1.57.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

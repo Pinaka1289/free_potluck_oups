@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { QRCodeSVG } from 'qrcode.react'
 import {
   Calendar,
   Clock,
   MapPin,
   User,
+  Users,
   Copy,
   Check,
   Plus,
@@ -15,8 +17,17 @@ import {
   Share2,
   Link as LinkIcon,
   Utensils,
-  ChefHat
+  ChefHat,
+  LayoutGrid,
+  Table2,
+  QrCode,
+  Download,
+  LogIn,
+  Bookmark,
+  X
 } from 'lucide-react'
+import Link from 'next/link'
+import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
@@ -44,6 +55,15 @@ export function EventPageClient({ event, initialItems }: Props) {
   const [loading, setLoading] = useState(false)
   const [showEditEventModal, setShowEditEventModal] = useState(false)
   const [eventData, setEventData] = useState(event)
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('table')
+  const [showClaimModal, setShowClaimModal] = useState(false)
+  const [claimingItem, setClaimingItem] = useState<Item | null>(null)
+  const [claimerName, setClaimerName] = useState('')
+  const [showQRModal, setShowQRModal] = useState(false)
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false)
+  const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null)
+  const [isEventSaved, setIsEventSaved] = useState(false)
+  const [savingEvent, setSavingEvent] = useState(false)
 
   const [itemForm, setItemForm] = useState({
     name: '',
@@ -71,7 +91,7 @@ export function EventPageClient({ event, initialItems }: Props) {
         {
           event: '*',
           schema: 'public',
-          table: 'items',
+          table: 'potluckpartys_items',
           filter: `event_id=eq.${event.id}`
         },
         (payload) => {
@@ -92,6 +112,100 @@ export function EventPageClient({ event, initialItems }: Props) {
       supabase.removeChannel(channel)
     }
   }, [event.id, supabase])
+
+  // Check user and show welcome modal on first visit
+  useEffect(() => {
+    const checkUserAndFirstVisit = async () => {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUser(user)
+
+      // Check if event is already saved to user's dashboard (owned or bookmarked)
+      if (user) {
+        if (event.user_id === user.id) {
+          setIsEventSaved(true)
+        } else {
+          // Check localStorage for bookmarked events
+          const savedEvents = JSON.parse(localStorage.getItem(`savedEvents_${user.id}`) || '[]')
+          if (savedEvents.includes(event.slug)) {
+            setIsEventSaved(true)
+          }
+        }
+      }
+
+      // Check if this is user's first visit to this event
+      const visitedEvents = JSON.parse(localStorage.getItem('visitedEvents') || '[]')
+      const hasVisited = visitedEvents.includes(event.slug)
+
+      if (!hasVisited) {
+        // Show welcome modal for first-time visitors
+        setShowWelcomeModal(true)
+        // Mark as visited
+        localStorage.setItem('visitedEvents', JSON.stringify([...visitedEvents, event.slug]))
+      }
+
+      // Check if there's a pending event to save after login
+      const pendingEventSlug = localStorage.getItem('pendingEventToSave')
+      if (user && pendingEventSlug === event.slug) {
+        // Auto-save the event to user's dashboard
+        await handleSaveEventToDashboard(user.id)
+        localStorage.removeItem('pendingEventToSave')
+      }
+    }
+
+    checkUserAndFirstVisit()
+  }, [event.slug, event.user_id, event.id, supabase])
+
+  // Save event to user's dashboard
+  const handleSaveEventToDashboard = async (userId?: string) => {
+    const uid = userId || currentUser?.id
+    if (!uid) {
+      // Store the event slug to save after login
+      localStorage.setItem('pendingEventToSave', event.slug)
+      showToast('Sign in to save this event to your dashboard', 'info')
+      return
+    }
+
+    setSavingEvent(true)
+    try {
+      // If the event has no owner, claim it
+      if (!event.user_id) {
+        const { error } = await supabase
+          .from('potluckpartys_events')
+          .update({ user_id: uid })
+          .eq('id', event.id)
+          .is('user_id', null)
+
+        if (!error) {
+          setIsEventSaved(true)
+          showToast('Event saved to your dashboard!', 'success')
+          setSavingEvent(false)
+          return
+        }
+      }
+      
+      // If event already has an owner (or claiming failed), bookmark it locally
+      const savedEvents = JSON.parse(localStorage.getItem(`savedEvents_${uid}`) || '[]')
+      if (!savedEvents.includes(event.slug)) {
+        savedEvents.push(event.slug)
+        localStorage.setItem(`savedEvents_${uid}`, JSON.stringify(savedEvents))
+      }
+      
+      setIsEventSaved(true)
+      showToast('Event added to your dashboard!', 'success')
+    } catch (error) {
+      console.error('Error saving event:', error)
+      showToast('Failed to save event', 'error')
+    } finally {
+      setSavingEvent(false)
+    }
+  }
+
+  // Handle sign in redirect
+  const handleSignInToSave = () => {
+    localStorage.setItem('pendingEventToSave', event.slug)
+    window.location.href = `/auth?redirect=/event/${event.slug}`
+  }
 
   const handleCopyLink = async () => {
     const url = getEventUrl(event.slug)
@@ -114,8 +228,8 @@ export function EventPageClient({ event, initialItems }: Props) {
 
     setLoading(true)
     try {
-      const { error } = await supabase
-        .from('items')
+      const { data, error } = await supabase
+        .from('potluckpartys_items')
         .insert({
           event_id: event.id,
           name: itemForm.name,
@@ -125,8 +239,15 @@ export function EventPageClient({ event, initialItems }: Props) {
           notes: itemForm.notes || null,
           claimed: !!itemForm.brought_by
         })
+        .select()
+        .single()
 
       if (error) throw error
+
+      // Manually update state for immediate UI feedback
+      if (data) {
+        setItems(prev => [...prev, data as Item])
+      }
 
       showToast('Item added successfully!', 'success')
       setShowAddModal(false)
@@ -145,8 +266,8 @@ export function EventPageClient({ event, initialItems }: Props) {
 
     setLoading(true)
     try {
-      const { error } = await supabase
-        .from('items')
+      const { data, error } = await supabase
+        .from('potluckpartys_items')
         .update({
           name: itemForm.name,
           category: itemForm.category,
@@ -156,8 +277,17 @@ export function EventPageClient({ event, initialItems }: Props) {
           claimed: !!itemForm.brought_by
         })
         .eq('id', editingItem.id)
+        .select()
+        .single()
 
       if (error) throw error
+
+      // Manually update state for immediate UI feedback
+      if (data) {
+        setItems(prev => prev.map(item => 
+          item.id === editingItem.id ? data as Item : item
+        ))
+      }
 
       showToast('Item updated successfully!', 'success')
       setEditingItem(null)
@@ -175,11 +305,14 @@ export function EventPageClient({ event, initialItems }: Props) {
 
     try {
       const { error } = await supabase
-        .from('items')
+        .from('potluckpartys_items')
         .delete()
         .eq('id', itemId)
 
       if (error) throw error
+
+      // Manually update state for immediate UI feedback
+      setItems(prev => prev.filter(item => item.id !== itemId))
 
       showToast('Item deleted', 'success')
     } catch (error) {
@@ -188,25 +321,50 @@ export function EventPageClient({ event, initialItems }: Props) {
     }
   }
 
-  const handleClaimItem = async (item: Item) => {
-    const name = prompt('Enter your name to claim this item:')
-    if (!name) return
+  const openClaimModal = (item: Item) => {
+    setClaimingItem(item)
+    setClaimerName('')
+    setShowClaimModal(true)
+  }
 
+  const handleClaimItem = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!claimingItem || !claimerName.trim()) {
+      showToast('Please enter your name', 'error')
+      return
+    }
+
+    setLoading(true)
     try {
-      const { error } = await supabase
-        .from('items')
+      const { data, error } = await supabase
+        .from('potluckpartys_items')
         .update({
-          brought_by: name,
+          brought_by: claimerName.trim(),
           claimed: true
         })
-        .eq('id', item.id)
+        .eq('id', claimingItem.id)
+        .select()
+        .single()
 
       if (error) throw error
 
-      showToast(`You're bringing ${item.name}!`, 'success')
+      // Manually update state for immediate UI feedback
+      if (data) {
+        setItems(prev => prev.map(i => 
+          i.id === claimingItem.id ? data as Item : i
+        ))
+      }
+
+      showToast(`You're bringing ${claimingItem.name}!`, 'success')
+      setShowClaimModal(false)
+      setClaimingItem(null)
+      setClaimerName('')
     } catch (error) {
       console.error('Error claiming item:', error)
       showToast('Failed to claim item', 'error')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -216,7 +374,7 @@ export function EventPageClient({ event, initialItems }: Props) {
     
     try {
       const { error } = await supabase
-        .from('events')
+        .from('potluckpartys_events')
         .update({
           title: eventForm.title,
           description: eventForm.description || null,
@@ -276,6 +434,7 @@ export function EventPageClient({ event, initialItems }: Props) {
 
   const totalItems = items.length
   const claimedItems = items.filter(item => item.claimed).length
+  const participants = new Set(items.filter(item => item.brought_by).map(item => item.brought_by)).size
 
   return (
     <div className="min-h-screen py-8 md:py-12">
@@ -350,6 +509,23 @@ export function EventPageClient({ event, initialItems }: Props) {
                   >
                     {copied ? 'Copied!' : 'Copy Link'}
                   </Button>
+                  {currentUser && !isEventSaved && !event.user_id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSaveEventToDashboard()}
+                      loading={savingEvent}
+                      icon={<Bookmark className="h-4 w-4" />}
+                    >
+                      Save to Dashboard
+                    </Button>
+                  )}
+                  {isEventSaved && (
+                    <span className="flex items-center gap-1 rounded-lg bg-emerald-500/10 px-3 py-1.5 text-sm text-emerald-400">
+                      <Check className="h-4 w-4" />
+                      Saved
+                    </span>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -362,25 +538,49 @@ export function EventPageClient({ event, initialItems }: Props) {
               </div>
 
               {/* Stats */}
-              <div className="mt-6 flex gap-6 border-t border-[rgb(var(--border))] pt-6">
-                <div>
-                  <div className="text-2xl font-bold text-[rgb(var(--foreground))]">{totalItems}</div>
-                  <div className="text-sm text-[rgb(var(--muted-foreground))]">Total Items</div>
+              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-[rgb(var(--border))] pt-6 sm:flex sm:gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--primary))]/10">
+                    <Utensils className="h-5 w-5 text-[rgb(var(--primary))]" />
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold text-[rgb(var(--foreground))]">{totalItems}</div>
+                    <div className="text-xs text-[rgb(var(--muted-foreground))]">Total Items</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-emerald-400">{claimedItems}</div>
-                  <div className="text-sm text-[rgb(var(--muted-foreground))]">Claimed</div>
+                <div className="flex items-center gap-2">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                    <Check className="h-5 w-5 text-emerald-400" />
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold text-emerald-400">{claimedItems}</div>
+                    <div className="text-xs text-[rgb(var(--muted-foreground))]">Claimed</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-amber-400">{totalItems - claimedItems}</div>
-                  <div className="text-sm text-[rgb(var(--muted-foreground))]">Available</div>
+                <div className="flex items-center gap-2">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
+                    <Plus className="h-5 w-5 text-amber-400" />
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold text-amber-400">{totalItems - claimedItems}</div>
+                    <div className="text-xs text-[rgb(var(--muted-foreground))]">Available</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500/10">
+                    <Users className="h-5 w-5 text-violet-400" />
+                  </div>
+                  <div>
+                    <div className="text-xl font-bold text-violet-400">{participants}</div>
+                    <div className="text-xs text-[rgb(var(--muted-foreground))]">Participants</div>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
         </motion.div>
 
-        {/* Share Banner */}
+        {/* Share Section with QR Code */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -388,23 +588,55 @@ export function EventPageClient({ event, initialItems }: Props) {
           className="mb-8"
         >
           <Card className="bg-[rgb(var(--primary))]/10 border-[rgb(var(--primary))]/30">
-            <CardContent className="flex flex-col items-center gap-4 py-4 md:flex-row md:justify-between">
-              <div className="flex items-center gap-3">
-                <Share2 className="h-5 w-5 text-[rgb(var(--primary))]" />
-                <span className="text-sm text-[rgb(var(--foreground))]">
-                  Share this link with your guests so they can add items
-                </span>
-              </div>
-              <div className="flex w-full items-center gap-2 md:w-auto">
-                <div className="flex flex-1 items-center gap-2 rounded-lg bg-[rgb(var(--card))] px-3 py-2 md:flex-none">
-                  <LinkIcon className="h-4 w-4 text-[rgb(var(--muted-foreground))]" />
-                  <code className="text-xs text-[rgb(var(--muted-foreground))] truncate max-w-[200px]">
-                    {getEventUrl(event.slug)}
-                  </code>
+            <CardContent className="py-6">
+              <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
+                {/* QR Code */}
+                <div className="flex-shrink-0">
+                  <div className="rounded-xl bg-white p-3 shadow-md">
+                    <QRCodeSVG
+                      value={getEventUrl(event.slug)}
+                      size={120}
+                      level="H"
+                      includeMargin={false}
+                      bgColor="#ffffff"
+                      fgColor="#000000"
+                    />
+                  </div>
                 </div>
-                <Button size="sm" onClick={handleCopyLink}>
-                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
+                
+                {/* Share Info */}
+                <div className="flex flex-1 flex-col items-center gap-4 text-center md:items-start md:text-left">
+                  <div>
+                    <div className="flex items-center justify-center gap-2 md:justify-start">
+                      <Share2 className="h-5 w-5 text-[rgb(var(--primary))]" />
+                      <span className="font-medium text-[rgb(var(--foreground))]">
+                        Share with Guests
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-[rgb(var(--muted-foreground))]">
+                      Scan the QR code or share the link so guests can add items
+                    </p>
+                  </div>
+                  
+                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                    <div className="flex flex-1 items-center gap-2 rounded-lg bg-[rgb(var(--card))] px-3 py-2">
+                      <LinkIcon className="h-4 w-4 flex-shrink-0 text-[rgb(var(--muted-foreground))]" />
+                      <code className="text-xs text-[rgb(var(--muted-foreground))] truncate">
+                        {getEventUrl(event.slug)}
+                      </code>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleCopyLink}>
+                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        <span className="ml-1">{copied ? 'Copied!' : 'Copy'}</span>
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setShowQRModal(true)}>
+                        <QrCode className="h-4 w-4" />
+                        <span className="ml-1 hidden sm:inline">Download</span>
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -416,14 +648,43 @@ export function EventPageClient({ event, initialItems }: Props) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-xl font-bold text-[rgb(var(--foreground))]">
               <Utensils className="mr-2 inline-block h-5 w-5 text-[rgb(var(--primary))]" />
               Potluck Items
             </h2>
-            <Button onClick={() => setShowAddModal(true)} icon={<Plus className="h-4 w-4" />}>
-              Add Item
-            </Button>
+            <div className="flex items-center gap-2">
+              {/* View Toggle */}
+              <div className="flex items-center rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-1">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
+                    viewMode === 'table'
+                      ? 'bg-[rgb(var(--primary))] text-white'
+                      : 'text-[rgb(var(--muted-foreground))] hover:text-[rgb(var(--foreground))]'
+                  )}
+                >
+                  <Table2 className="h-4 w-4" />
+                  <span className="hidden sm:inline">Table</span>
+                </button>
+                <button
+                  onClick={() => setViewMode('card')}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-all',
+                    viewMode === 'card'
+                      ? 'bg-[rgb(var(--primary))] text-white'
+                      : 'text-[rgb(var(--muted-foreground))] hover:text-[rgb(var(--foreground))]'
+                  )}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  <span className="hidden sm:inline">Cards</span>
+                </button>
+              </div>
+              <Button onClick={() => setShowAddModal(true)} icon={<Plus className="h-4 w-4" />}>
+                Add Item
+              </Button>
+            </div>
           </div>
 
           {items.length === 0 ? (
@@ -443,7 +704,8 @@ export function EventPageClient({ event, initialItems }: Props) {
                 </Button>
               </CardContent>
             </Card>
-          ) : (
+          ) : viewMode === 'card' ? (
+            /* Card View */
             <div className="space-y-6">
               {Object.entries(itemsByCategory).map(([category, categoryItems]) => (
                 <Card key={category}>
@@ -488,7 +750,7 @@ export function EventPageClient({ event, initialItems }: Props) {
                                 </div>
                               ) : (
                                 <button
-                                  onClick={() => handleClaimItem(item)}
+                                  onClick={() => openClaimModal(item)}
                                   className="mt-1 text-sm text-[rgb(var(--primary))] hover:underline"
                                 >
                                   Click to claim
@@ -522,6 +784,125 @@ export function EventPageClient({ event, initialItems }: Props) {
                 </Card>
               ))}
             </div>
+          ) : (
+            /* Table View */
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-[rgb(var(--border))] bg-[rgb(var(--secondary))]/50">
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[rgb(var(--muted-foreground))]">
+                          Item
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[rgb(var(--muted-foreground))]">
+                          Category
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[rgb(var(--muted-foreground))]">
+                          Qty
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[rgb(var(--muted-foreground))]">
+                          Brought By
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[rgb(var(--muted-foreground))]">
+                          Status
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-[rgb(var(--muted-foreground))]">
+                          Notes
+                        </th>
+                        <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-[rgb(var(--muted-foreground))]">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[rgb(var(--border))]">
+                      <AnimatePresence mode="popLayout">
+                        {items.map((item) => (
+                          <motion.tr
+                            key={item.id}
+                            layout
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="group transition-colors hover:bg-[rgb(var(--secondary))]/30"
+                          >
+                            <td className="px-4 py-3">
+                              <span className="font-medium text-[rgb(var(--foreground))]">
+                                {item.name}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={cn(
+                                'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
+                                CATEGORY_STYLES[item.category as ItemCategory]?.color
+                              )}>
+                                {CATEGORY_STYLES[item.category as ItemCategory]?.icon}
+                                {item.category}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className="rounded-md bg-[rgb(var(--secondary))] px-2 py-1 text-sm font-medium text-[rgb(var(--foreground))]">
+                                {item.quantity}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              {item.brought_by ? (
+                                <span className="flex items-center gap-1.5 text-sm text-[rgb(var(--foreground))]">
+                                  <User className="h-3.5 w-3.5 text-[rgb(var(--primary))]" />
+                                  {item.brought_by}
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => openClaimModal(item)}
+                                  className="text-sm text-[rgb(var(--primary))] hover:underline"
+                                >
+                                  Click to claim
+                                </button>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {item.claimed ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
+                                  <Check className="h-3 w-3" />
+                                  Claimed
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-400">
+                                  Available
+                                </span>
+                              )}
+                            </td>
+                            <td className="max-w-[150px] px-4 py-3">
+                              <span className="truncate text-sm text-[rgb(var(--muted-foreground))]">
+                                {item.notes || '-'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center justify-center gap-1">
+                                <button
+                                  onClick={() => openEditModal(item)}
+                                  className="rounded-lg p-1.5 text-[rgb(var(--muted-foreground))] transition-colors hover:bg-[rgb(var(--secondary))] hover:text-[rgb(var(--foreground))]"
+                                  title="Edit item"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteItem(item.id)}
+                                  className="rounded-lg p-1.5 text-[rgb(var(--muted-foreground))] transition-colors hover:bg-[rgb(var(--destructive))]/10 hover:text-[rgb(var(--destructive))]"
+                                  title="Delete item"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </motion.tr>
+                        ))}
+                      </AnimatePresence>
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
           )}
         </motion.div>
 
@@ -719,6 +1100,248 @@ export function EventPageClient({ event, initialItems }: Props) {
               </Button>
             </div>
           </form>
+        </Modal>
+
+        {/* Claim Item Modal */}
+        <Modal
+          isOpen={showClaimModal}
+          onClose={() => {
+            setShowClaimModal(false)
+            setClaimingItem(null)
+            setClaimerName('')
+          }}
+          title="Claim This Item"
+          description={claimingItem ? `You're claiming "${claimingItem.name}"` : ''}
+        >
+          <form onSubmit={handleClaimItem} className="space-y-4">
+            <Input
+              id="claimer-name"
+              label="Your Name"
+              placeholder="Enter your name"
+              value={claimerName}
+              onChange={(e) => setClaimerName(e.target.value)}
+              icon={<User className="h-5 w-5" />}
+              required
+              autoFocus
+            />
+            <p className="text-sm text-[rgb(var(--muted-foreground))]">
+              Let everyone know you&apos;re bringing this item!
+            </p>
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowClaimModal(false)
+                  setClaimingItem(null)
+                  setClaimerName('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1" loading={loading}>
+                Claim Item
+              </Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* QR Code Download Modal */}
+        <Modal
+          isOpen={showQRModal}
+          onClose={() => setShowQRModal(false)}
+          title="Download QR Code"
+          description="Save the QR code to print or share"
+        >
+          <div className="flex flex-col items-center space-y-6">
+            <div className="rounded-2xl bg-white p-4 shadow-lg">
+              <QRCodeSVG
+                value={getEventUrl(event.slug)}
+                size={200}
+                level="H"
+                includeMargin={true}
+                bgColor="#ffffff"
+                fgColor="#000000"
+              />
+            </div>
+            
+            <div className="text-center">
+              <p className="text-sm font-medium text-[rgb(var(--foreground))]">
+                {eventData.title}
+              </p>
+              <p className="mt-1 text-xs text-[rgb(var(--muted-foreground))]">
+                Share this QR code with your guests
+              </p>
+            </div>
+
+            <div className="flex w-full gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  const canvas = document.querySelector('#qr-code-modal canvas') as HTMLCanvasElement
+                  if (canvas) {
+                    const link = document.createElement('a')
+                    link.download = `${eventData.title.replace(/\s+/g, '-')}-qr-code.png`
+                    link.href = canvas.toDataURL('image/png')
+                    link.click()
+                  } else {
+                    // For SVG, convert to canvas first
+                    const svg = document.querySelector('.modal-content svg') as SVGElement
+                    if (svg) {
+                      const svgData = new XMLSerializer().serializeToString(svg)
+                      const canvas = document.createElement('canvas')
+                      const ctx = canvas.getContext('2d')
+                      const img = new Image()
+                      img.onload = () => {
+                        canvas.width = img.width
+                        canvas.height = img.height
+                        ctx?.drawImage(img, 0, 0)
+                        const link = document.createElement('a')
+                        link.download = `${eventData.title.replace(/\s+/g, '-')}-qr-code.png`
+                        link.href = canvas.toDataURL('image/png')
+                        link.click()
+                      }
+                      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)))
+                    }
+                  }
+                  showToast('QR code downloaded!', 'success')
+                }}
+                icon={<Download className="h-4 w-4" />}
+              >
+                Download
+              </Button>
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  copyToClipboard(getEventUrl(event.slug))
+                  showToast('Link copied!', 'success')
+                }}
+                icon={<Copy className="h-4 w-4" />}
+              >
+                Copy Link
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Welcome Modal for First-Time Visitors */}
+        <Modal
+          isOpen={showWelcomeModal}
+          onClose={() => setShowWelcomeModal(false)}
+          title={`Welcome to ${eventData.title}!`}
+          description="You've been invited to this potluck event"
+        >
+          <div className="space-y-6">
+            {/* Event Info */}
+            <div className="rounded-xl bg-[rgb(var(--secondary))]/50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-[rgb(var(--primary))] to-[rgb(var(--accent))]">
+                  <ChefHat className="h-6 w-6 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-[rgb(var(--foreground))]">{eventData.title}</h3>
+                  {eventData.event_date && (
+                    <p className="mt-1 text-sm text-[rgb(var(--muted-foreground))]">
+                      {formatDate(eventData.event_date)} {eventData.event_time && `at ${formatTime(eventData.event_time)}`}
+                    </p>
+                  )}
+                  {eventData.location && (
+                    <p className="text-sm text-[rgb(var(--muted-foreground))]">{eventData.location}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Options */}
+            <div className="space-y-3">
+              <p className="text-center text-sm text-[rgb(var(--muted-foreground))]">
+                What would you like to do?
+              </p>
+
+              {!currentUser ? (
+                <>
+                  {/* Sign In Option */}
+                  <button
+                    onClick={handleSignInToSave}
+                    className="flex w-full items-center gap-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-4 text-left transition-all hover:border-[rgb(var(--primary))] hover:bg-[rgb(var(--primary))]/5"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--primary))]/20">
+                      <LogIn className="h-5 w-5 text-[rgb(var(--primary))]" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-[rgb(var(--foreground))]">Sign in to save this event</p>
+                      <p className="text-sm text-[rgb(var(--muted-foreground))]">
+                        Access it anytime from your dashboard
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Continue Without Login */}
+                  <button
+                    onClick={() => setShowWelcomeModal(false)}
+                    className="flex w-full items-center gap-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-4 text-left transition-all hover:border-[rgb(var(--primary))] hover:bg-[rgb(var(--secondary))]"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--secondary))]">
+                      <Utensils className="h-5 w-5 text-[rgb(var(--muted-foreground))]" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-[rgb(var(--foreground))]">Continue without signing in</p>
+                      <p className="text-sm text-[rgb(var(--muted-foreground))]">
+                        You can still add items and participate
+                      </p>
+                    </div>
+                  </button>
+
+                  <p className="text-center text-xs text-[rgb(var(--muted-foreground))]">
+                    ✨ Signing in is <span className="font-medium">optional</span> - you can always participate without an account!
+                  </p>
+                </>
+              ) : (
+                <>
+                  {/* Save to Dashboard Option for Logged-in Users */}
+                  {!isEventSaved && (
+                    <button
+                      onClick={() => {
+                        handleSaveEventToDashboard()
+                        setShowWelcomeModal(false)
+                      }}
+                      className="flex w-full items-center gap-4 rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-4 text-left transition-all hover:border-[rgb(var(--primary))] hover:bg-[rgb(var(--primary))]/5"
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[rgb(var(--primary))]/20">
+                        <Bookmark className="h-5 w-5 text-[rgb(var(--primary))]" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-[rgb(var(--foreground))]">Add to my dashboard</p>
+                        <p className="text-sm text-[rgb(var(--muted-foreground))]">
+                          Quick access from your account anytime
+                        </p>
+                      </div>
+                    </button>
+                  )}
+
+                  {/* Already Saved Info */}
+                  {isEventSaved && (
+                    <div className="flex items-center gap-3 rounded-xl border border-green-500/30 bg-green-500/10 p-4">
+                      <Check className="h-5 w-5 text-green-500" />
+                      <p className="text-sm text-green-600 dark:text-green-400">
+                        This event is already in your dashboard!
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Continue Button */}
+                  <Button
+                    className="w-full"
+                    onClick={() => setShowWelcomeModal(false)}
+                  >
+                    {isEventSaved ? 'View Event' : 'Continue to Event'}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
         </Modal>
       </div>
     </div>
