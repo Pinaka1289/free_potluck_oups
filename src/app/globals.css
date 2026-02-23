@@ -84,6 +84,116 @@
   }
 }
 
+/* PotluckPartyLoader animations */
+@keyframes potluck-float {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  33% { transform: translateY(-20px) translateX(10px); }
+  66% { transform: translateY(-10px) translateX(-10px); }
+}
+@keyframes potluck-wave {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  50% { transform: translateY(-12px) scaleY(1.1); }
+}
+@keyframes potluck-rise {
+  0% { transform: translateY(0) scale(0.5); opacity: 0.8; }
+  50% { opacity: 0.6; }
+  100% { transform: translateY(-100px) scale(1.2); opacity: 0; }
+}
+@keyframes potluck-steam {
+  0% { transform: translateY(0) scaleX(1) scaleY(1); opacity: 0; }
+  20% { opacity: 0.6; }
+  100% { transform: translateY(-80px) scaleX(1.8) scaleY(1.5); opacity: 0; }
+}
+@keyframes potluck-sway {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(10px); }
+}
+@keyframes potluck-lid-bounce {
+  0%, 100% { transform: translateY(0) translateX(-50%); }
+  50% { transform: translateY(-10px) translateX(-50%); }
+}
+@keyframes potluck-lid-float {
+  0%, 100% { transform: translateY(0) translateX(-50%); }
+  50% { transform: translateY(-5px) translateX(-50%); }
+}
+@keyframes potluck-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(255,255,255,0.5); }
+  50% { box-shadow: 0 0 40px rgba(255,255,255,0.8), 0 0 60px rgba(255,255,255,0.4); }
+}
+@keyframes potluck-shine {
+  0% { transform: translateX(-100%) rotate(45deg); opacity: 0; }
+  50% { opacity: 0.6; }
+  100% { transform: translateX(100%) rotate(45deg); opacity: 0; }
+}
+@keyframes potluck-sparkle {
+  0% { transform: translate(0, 0) scale(0) rotate(0deg); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translate(var(--potluck-tx, 0), var(--potluck-ty, -50px)) scale(1.5) rotate(180deg); opacity: 0; }
+}
+@keyframes potluck-heart-float {
+  0% { transform: translateY(0) translateX(var(--potluck-hx, 0)) scale(0); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-150px) translateX(var(--potluck-hx, 0)) scale(1.2); opacity: 0; }
+}
+@keyframes potluck-dot-pulse {
+  0%, 100% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.5); opacity: 1; }
+}
+@keyframes potluck-shimmer {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.3; }
+}
+@keyframes potluck-slide-progress {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+@keyframes potluck-text-glow {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(255,105,180,0.3)); }
+  50% { filter: drop-shadow(0 0 20px rgba(255,105,180,0.6)); }
+}
+@keyframes potluck-flame-rise {
+  0% { transform: translateY(0) scale(1); opacity: 1; }
+  100% { transform: translateY(-40px) scale(0.5); opacity: 0; }
+}
+@keyframes potluck-fade-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes potluck-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.1); }
+}
+@keyframes potluck-pot-shuffle {
+  0%, 25%, 50%, 75%, 100% { transform: scale(1); }
+  26%, 51%, 76% { transform: translateX(-5px) scale(1.03); }
+  28%, 53%, 78% { transform: translateX(5px) scale(1.03); }
+}
+@keyframes potluck-toss {
+  0% { transform: translateY(0) rotate(0deg) scale(0.5); opacity: 0; }
+  20% { opacity: 1; transform: translateY(-20px) rotate(90deg) scale(1.2); }
+  50% { transform: translateY(280px) rotate(360deg) scale(1); opacity: 1; }
+  60% { transform: translateY(300px) scale(1.4, 0.7); opacity: 0; }
+  100% { transform: translateY(300px); opacity: 0; }
+}
+@keyframes potluck-veg-float {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 1; }
+  33% { transform: translateY(-12px) translateX(4px); opacity: 1; }
+  66% { transform: translateY(-6px) translateX(-4px); opacity: 1; }
+}
+@keyframes potluck-steam-rise {
+  0% { transform: translateY(0) scale(1); opacity: 0; filter: blur(0); }
+  50% { opacity: 0.6; filter: blur(2px); }
+  100% { transform: translateY(-140px) scale(2.5); opacity: 0; filter: blur(10px); }
+}
+@keyframes potluck-text-glow-dark {
+  0%, 100% { text-shadow: 0 0 20px rgba(255,255,255,0.5), 0 0 40px rgba(255,105,180,0.3); }
+  50% { text-shadow: 0 0 30px rgba(255,255,255,0.8), 0 0 60px rgba(255,105,180,0.6); }
+}
+@keyframes potluck-orbit-rotate {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
 :root {
   --background: 18 18 18;
   --foreground: 250 250 250;

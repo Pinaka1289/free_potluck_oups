@@ -35,11 +35,17 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  // Do not run code between createServerClient and
-  // supabase.auth.getUser(). A simple mistake could make it very hard to debug
-  // issues with users being randomly logged out.
-
-  await supabase.auth.getUser()
+  // Wrap getUser() in a 3-second timeout so a slow/unreachable Supabase auth
+  // server never stalls every page load. If it times out, cookies are not
+  // refreshed for this request but the page still returns quickly.
+  try {
+    await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ])
+  } catch {
+    // Network failure – continue without blocking the response
+  }
 
   return supabaseResponse
 }

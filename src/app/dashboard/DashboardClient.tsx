@@ -85,10 +85,10 @@ export function DashboardClient({ user, profile, initialEvents }: Props) {
         if (error) throw error
 
         // Mark these events as bookmarked
-        const bookmarkedWithFlag = (data || []).map(event => ({
+        const bookmarkedWithFlag = (data || []).map((event: EventWithCount) => ({
           ...event,
           isBookmarked: true
-        }))
+        })) as EventWithCount[]
 
         setBookmarkedEvents(bookmarkedWithFlag)
       } catch (error) {
@@ -220,8 +220,10 @@ export function DashboardClient({ user, profile, initialEvents }: Props) {
         return
       }
 
+      const typedEventData = eventData as unknown as EventWithCount
+
       // If user owns this event, it should already be in their list
-      if (eventData.user_id === user.id) {
+      if (typedEventData.user_id === user.id) {
         showToast('This event is already in your dashboard', 'info')
         setEventLinkInput('')
         setShowAddEventModal(false)
@@ -237,12 +239,12 @@ export function DashboardClient({ user, profile, initialEvents }: Props) {
 
       // Add to bookmarked events state
       const newBookmarkedEvent: EventWithCount = {
-        ...eventData,
+        ...typedEventData,
         isBookmarked: true
       }
       setBookmarkedEvents(prev => [...prev, newBookmarkedEvent])
 
-      showToast(`"${eventData.title}" added to your dashboard!`, 'success')
+      showToast(`"${typedEventData.title}" added to your dashboard!`, 'success')
       setEventLinkInput('')
       setShowAddEventModal(false)
     } catch (error) {

@@ -28,19 +28,52 @@ export default function AuthPage() {
     fullName: ''
   })
 
+  // Check for error in URL params
+  useEffect(() => {
+    const errorParam = searchParams.get('error')
+    if (errorParam) {
+      let errorMessage = 'Authentication failed'
+      if (errorParam === 'auth_callback_error') {
+        errorMessage = 'Failed to complete Google sign-in. Please try again.'
+      } else if (errorParam === 'session_not_established') {
+        errorMessage = 'Session not established. Please try signing in again.'
+      } else if (errorParam === 'no_code') {
+        errorMessage = 'Invalid authentication request. Please try again.'
+      }
+      showToast(errorMessage, 'error')
+      // Clean up URL
+      router.replace('/auth')
+    }
+  }, [searchParams, showToast, router])
+
   // Check if user is already logged in
   useEffect(() => {
     const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        // Check for redirect URL
-        const redirectUrl = searchParams.get('redirect')
-        if (redirectUrl) {
-          router.push(redirectUrl)
-        } else {
-          router.push('/dashboard')
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        
+        if (error) {
+          console.error('Auth check error:', error)
+          setCheckingAuth(false)
+          return
         }
-      } else {
+        
+        if (user) {
+          // Small delay to ensure session is fully established
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
+          // Check for redirect URL
+          const redirectUrl = searchParams.get('redirect')
+          if (redirectUrl) {
+            router.push(redirectUrl)
+          } else {
+            router.push('/dashboard')
+          }
+        } else {
+          setCheckingAuth(false)
+        }
+      } catch (err) {
+        console.error('User check error:', err)
         setCheckingAuth(false)
       }
     }
@@ -132,10 +165,11 @@ export default function AuthPage() {
 
   const handleGoogleSignIn = async () => {
     try {
+      const redirectUrl = searchParams.get('redirect') || '/dashboard'
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`
         }
       })
 

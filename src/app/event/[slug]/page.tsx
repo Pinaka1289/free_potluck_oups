@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { EventPageClient } from './EventPageClient'
+import type { Event, Item } from '@/types/database'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -16,15 +17,17 @@ export async function generateMetadata({ params }: Props) {
     .eq('slug', slug)
     .single()
 
-  if (!event) {
+  const typedEvent = event as { title: string; description: string | null } | null
+
+  if (!typedEvent) {
     return {
       title: 'Event Not Found',
     }
   }
 
   return {
-    title: `${event.title} | PotluckPartys`,
-    description: event.description || 'Join this potluck event and claim what you\'re bringing!',
+    title: `${typedEvent.title} | PotluckPartys`,
+    description: typedEvent.description || 'Join this potluck event and claim what you\'re bringing!',
   }
 }
 
@@ -38,16 +41,20 @@ export default async function EventPage({ params }: Props) {
     .eq('slug', slug)
     .single()
 
-  if (error || !event) {
+  const typedEvent = event as unknown as Event | null
+
+  if (error || !typedEvent) {
     notFound()
   }
 
   const { data: items } = await supabase
     .from('potluckpartys_items')
     .select('*')
-    .eq('event_id', event.id)
+    .eq('event_id', typedEvent.id)
     .order('category', { ascending: true })
     .order('created_at', { ascending: true })
 
-  return <EventPageClient event={event} initialItems={items || []} />
+  const typedItems = (items || []) as unknown as Item[]
+
+  return <EventPageClient event={typedEvent} initialItems={typedItems} />
 }

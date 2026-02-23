@@ -5,20 +5,65 @@ import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
 import './globals.css'
 
+const SITE_NAME = 'PotluckPartys'
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://potluckpartys.com'
+const SITE_TITLE = 'PotluckPartys | Free Potluck Organizer with AI Ideas & Recipes'
+const SITE_DESC =
+  'PotluckPartys is the free potluck event organizer with built-in AI. Create a potluck event in seconds, share via link or QR code, let guests claim dishes, and use AI to generate potluck food ideas and full recipes — no sign-up required.'
+
 export const metadata: Metadata = {
-  title: 'PotluckPartys - Free Potluck Event Organizer',
-  description: 'Create and organize potluck events for free. No sign-up required! Share links with guests and let everyone contribute to the feast.',
-  keywords: ['potluck', 'event', 'party', 'food', 'organizer', 'free'],
-  authors: [{ name: 'PotluckPartys' }],
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESC,
+  keywords: [
+    'potluck organizer',
+    'free potluck planner',
+    'potluck event app',
+    'potluck ideas',
+    'AI potluck ideas',
+    'AI recipe generator',
+    'potluck food ideas',
+    'organize potluck',
+    'potluck party planner',
+    'share potluck link',
+    'potluck dish tracker',
+    'free party planner',
+    'potluck sign up sheet',
+    'who is bringing what potluck',
+    'potluck app free',
+  ],
+  authors: [{ name: SITE_NAME, url: SITE_URL }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
     apple: '/favicon.svg',
   },
   openGraph: {
-    title: 'PotluckPartys - Free Potluck Event Organizer',
-    description: 'Create and organize potluck events for free. No sign-up required!',
+    title: SITE_TITLE,
+    description: SITE_DESC,
     type: 'website',
+    siteName: SITE_NAME,
+    url: SITE_URL,
+    locale: 'en_US',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: SITE_TITLE,
+    description: SITE_DESC,
+    creator: '@potluckpartys',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
+  alternates: {
+    canonical: '/',
   },
 }
 

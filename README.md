@@ -24,6 +24,9 @@ A beautiful, fully responsive web application for organizing potluck events. Cre
 - 🍽️ **Item Management** - Add, edit, delete, and claim items
 - 📂 **Categories** - Organize items by type (appetizers, mains, desserts, etc.)
 - 🔗 **Easy Sharing** - One-click copy link functionality
+- 📤 **Bulk Upload** - Import multiple items via CSV file with downloadable template
+- 🌐 **QR Codes** - Auto-generated QR codes for easy mobile access
+- 🔖 **Save Events** - Bookmark events to your dashboard via link or code
 - 🌓 **Dark/Light Mode** - Choose your preferred theme (dark mode default)
 - 📱 **Fully Responsive** - Works beautifully on all devices
 - ⚡ **Real-time Updates** - See changes as they happen
@@ -122,6 +125,42 @@ src/
 | email | TEXT | User's email |
 | full_name | TEXT | User's full name |
 | avatar_url | TEXT | Profile picture URL |
+
+## 📤 Bulk Upload Feature
+
+Save time by uploading multiple items at once via CSV file!
+
+### How to Use Bulk Upload:
+
+1. **Download Template**
+   - Click "Bulk Upload" on your event page
+   - Download the CSV template
+   - Template includes: `potluck-items-template.csv`
+
+2. **Fill Your Items**
+   ```csv
+   Item Name,Category,Quantity,Brought By,Notes
+   Pasta Salad,Side Dishes,1,John Doe,Vegetarian option
+   Grilled Chicken,Main Dishes,2,Jane Smith,BBQ sauce
+   ```
+
+3. **Upload**
+   - Select your CSV file
+   - Click "Upload Items"
+   - Review results (success/failed count)
+
+4. **Categories Supported**
+   - Appetizers, Main Dishes, Side Dishes, Salads, Desserts
+   - Drinks, Snacks, Bread & Rolls, Utensils & Plates, Other
+
+### Features:
+- ✅ Validate data before insertion
+- ✅ Detailed error reporting per row
+- ✅ Supports up to 100 items per upload
+- ✅ Auto-claim items with "Brought By" filled
+- ✅ Works with Excel (save as CSV)
+
+See `public/BULK_UPLOAD_GUIDE.md` for detailed instructions.
 
 ## 🎨 Customization
 

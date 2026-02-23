@@ -77,7 +77,24 @@ export const CATEGORY_STYLES: Record<ItemCategory, { icon: string; color: string
   'Other': { icon: '📦', color: 'bg-purple-500/20 text-purple-400' },
 }
 
+// Top cuisines for Quick Food Ideas
+export const TOP_CUISINES = [
+  'Italian',
+  'Mexican',
+  'Indian',
+  'Chinese',
+  'Japanese',
+  'American',
+  'Mediterranean',
+  'Thai',
+  'BBQ / Southern',
+  'Vegetarian / Vegan',
+] as const
+
 // Classnames utility
 export function cn(...classes: (string | boolean | undefined | null)[]): string {
   return classes.filter(Boolean).join(' ')
 }
+
+// AI Quota Configuration
+export const AI_QUOTA_LIMIT = parseInt(process.env.AI_QUOTA_LIMIT || '3', 10)

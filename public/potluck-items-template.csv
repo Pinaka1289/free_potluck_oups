@@ -1,0 +1,7 @@
+Item Name,Category,Quantity,Brought By,Notes
+">> Valid categories (use exactly): Appetizers | Main Dishes | Side Dishes | Salads | Desserts | Drinks | Snacks | Bread & Rolls | Utensils & Plates | Other",,,,
+Pasta Salad,Side Dishes,1,John Doe,Vegetarian option available
+Grilled Chicken,Main Dishes,2,Jane Smith,BBQ sauce on the side
+Fruit Platter,Desserts,1,,Fresh seasonal fruits
+Iced Tea,Drinks,3,,Unsweetened and sweetened options
+Paper Plates,Utensils & Plates,1,,50 count package

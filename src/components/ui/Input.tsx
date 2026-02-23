@@ -32,8 +32,8 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             id={id}
             className={cn(
               'w-full rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--card))] px-4 py-3 text-[rgb(var(--foreground))] placeholder-[rgb(var(--muted-foreground))] transition-all focus:border-[rgb(var(--primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--primary))]/20',
-              icon && 'pl-11',
-              error && 'border-[rgb(var(--destructive))] focus:border-[rgb(var(--destructive))] focus:ring-[rgb(var(--destructive))]/20',
+              icon ? 'pl-11' : '',
+              error ? 'border-[rgb(var(--destructive))] focus:border-[rgb(var(--destructive))] focus:ring-[rgb(var(--destructive))]/20' : '',
               className
             )}
             {...props}

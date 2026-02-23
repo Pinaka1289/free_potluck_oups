@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { QRCodeSVG } from 'qrcode.react'
+import Papa from 'papaparse'
 import {
   Calendar,
   Clock,
@@ -24,7 +25,9 @@ import {
   Download,
   LogIn,
   Bookmark,
-  X
+  X,
+  Upload,
+  FileSpreadsheet
 } from 'lucide-react'
 import Link from 'next/link'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
@@ -36,8 +39,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Modal } from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import { createClient } from '@/lib/supabase/client'
-import { formatDate, formatTime, getEventUrl, copyToClipboard, ITEM_CATEGORIES, CATEGORY_STYLES, cn } from '@/lib/utils'
-import type { Event, Item, ItemCategory } from '@/types/database'
+import { formatDate, formatTime, getEventUrl, copyToClipboard, ITEM_CATEGORIES, CATEGORY_STYLES, cn, type ItemCategory } from '@/lib/utils'
+import type { Event, Item } from '@/types/database'
 
 interface Props {
   event: Event
@@ -64,6 +67,10 @@ export function EventPageClient({ event, initialItems }: Props) {
   const [currentUser, setCurrentUser] = useState<SupabaseUser | null>(null)
   const [isEventSaved, setIsEventSaved] = useState(false)
   const [savingEvent, setSavingEvent] = useState(false)
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false)
+  const [uploadFile, setUploadFile] = useState<File | null>(null)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadResults, setUploadResults] = useState<{ success: number; failed: number; errors: string[] } | null>(null)
 
   const [itemForm, setItemForm] = useState({
     name: '',
@@ -172,7 +179,7 @@ export function EventPageClient({ event, initialItems }: Props) {
       if (!event.user_id) {
         const { error } = await supabase
           .from('potluckpartys_events')
-          .update({ user_id: uid })
+          .update({ user_id: uid } as never)
           .eq('id', event.id)
           .is('user_id', null)
 
@@ -238,7 +245,7 @@ export function EventPageClient({ event, initialItems }: Props) {
           brought_by: itemForm.brought_by || null,
           notes: itemForm.notes || null,
           claimed: !!itemForm.brought_by
-        })
+        } as never)
         .select()
         .single()
 
@@ -275,7 +282,7 @@ export function EventPageClient({ event, initialItems }: Props) {
           brought_by: itemForm.brought_by || null,
           notes: itemForm.notes || null,
           claimed: !!itemForm.brought_by
-        })
+        } as never)
         .eq('id', editingItem.id)
         .select()
         .single()
@@ -342,7 +349,7 @@ export function EventPageClient({ event, initialItems }: Props) {
         .update({
           brought_by: claimerName.trim(),
           claimed: true
-        })
+        } as never)
         .eq('id', claimingItem.id)
         .select()
         .single()
@@ -382,7 +389,7 @@ export function EventPageClient({ event, initialItems }: Props) {
           event_time: eventForm.event_time || null,
           location: eventForm.location || null,
           host_name: eventForm.host_name || null
-        })
+        } as never)
         .eq('id', event.id)
 
       if (error) throw error
@@ -399,6 +406,153 @@ export function EventPageClient({ event, initialItems }: Props) {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Handle bulk upload of items from CSV
+  type BulkRow = { 'Item Name': string; 'Category': string; 'Quantity': string; 'Brought By': string; 'Notes': string }
+
+  const validateAndInsertBulkRows = async (data: BulkRow[]) => {
+    const errors: string[] = []
+    const itemsToInsert: Array<{ event_id: string; name: string; category: string; quantity: number; brought_by: string | null; notes: string | null; claimed: boolean }> = []
+
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i]
+      const rowNum = i + 2
+      const itemName = row['Item Name']?.trim() ?? ''
+      if (itemName.startsWith('>>')) continue
+      if (!itemName) {
+        errors.push(`Row ${rowNum}: Item name is required`)
+        continue
+      }
+      const category = row['Category']?.trim() || 'Other'
+      if (!ITEM_CATEGORIES.includes(category as ItemCategory)) {
+        errors.push(`Row ${rowNum}: Invalid category "${category}"`)
+        continue
+      }
+      const quantity = parseInt(String(row['Quantity']), 10) || 1
+      if (quantity < 1) {
+        errors.push(`Row ${rowNum}: Quantity must be at least 1`)
+        continue
+      }
+      itemsToInsert.push({
+        event_id: event.id,
+        name: itemName,
+        category,
+        quantity,
+        brought_by: row['Brought By']?.trim() || null,
+        notes: row['Notes']?.trim() || null,
+        claimed: !!(row['Brought By']?.trim())
+      })
+    }
+
+    if (itemsToInsert.length === 0) {
+      setUploadResults({ success: 0, failed: data.length, errors })
+      setLoading(false)
+      return
+    }
+
+    try {
+      const { data: insertedData, error } = await supabase
+        .from('potluckpartys_items')
+        .insert(itemsToInsert as never)
+        .select()
+
+      if (error) {
+        errors.push(`Database error: ${error.message}`)
+        setUploadResults({ success: 0, failed: itemsToInsert.length, errors })
+      } else {
+        const newItems = insertedData as unknown as Item[]
+        setItems(prev => [...prev, ...newItems])
+        setUploadResults({ success: itemsToInsert.length, failed: errors.length, errors })
+        showToast(`Successfully added ${itemsToInsert.length} items!`, 'success')
+      }
+    } catch (err) {
+      console.error('Error during bulk insert:', err)
+      errors.push('Failed to insert items into database')
+      setUploadResults({ success: 0, failed: itemsToInsert.length, errors })
+    } finally {
+      setLoading(false)
+      setUploadProgress(100)
+    }
+  }
+
+  const handleBulkUpload = async () => {
+    if (!uploadFile) {
+      showToast('Please select a file to upload', 'error')
+      return
+    }
+
+    setLoading(true)
+    setUploadProgress(0)
+    setUploadResults(null)
+    const ext = uploadFile.name.split('.').pop()?.toLowerCase()
+
+    if (ext === 'xlsx' || ext === 'xls') {
+      const form = new FormData()
+      form.append('file', uploadFile)
+      const res = await fetch('/api/potluck-parse', { method: 'POST', body: form })
+      const json = await res.json()
+      if (!res.ok) {
+        showToast(json.error || 'Failed to parse Excel file.', 'error')
+        setLoading(false)
+        return
+      }
+      await validateAndInsertBulkRows(json.data as BulkRow[])
+      return
+    }
+
+    Papa.parse(uploadFile, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        const data = results.data as BulkRow[]
+        await validateAndInsertBulkRows(data)
+      },
+      error: (err) => {
+        console.error('Error parsing CSV:', err)
+        showToast('Failed to parse CSV file. Please check the format.', 'error')
+        setLoading(false)
+      }
+    })
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const ext = file.name.split('.').pop()?.toLowerCase()
+      if (ext !== 'csv' && ext !== 'xlsx' && ext !== 'xls') {
+        showToast('Please upload a CSV or Excel (.xlsx) file', 'error')
+        return
+      }
+      setUploadFile(file)
+      setUploadResults(null)
+    }
+  }
+
+  const downloadTemplateExcel = async () => {
+    try {
+      const res = await fetch('/api/potluck-template')
+      if (!res.ok) throw new Error('Download failed')
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'potluck-items-template.xlsx'
+      a.click()
+      URL.revokeObjectURL(url)
+      showToast('Excel template downloaded! Category column has a dropdown.', 'success')
+    } catch (err) {
+      console.error('Template download error:', err)
+      showToast('Failed to download Excel template.', 'error')
+    }
+  }
+
+  const downloadTemplateCSV = () => {
+    const link = document.createElement('a')
+    link.href = '/potluck-items-template.csv'
+    link.download = 'potluck-items-template.csv'
+    link.click()
+    showToast('CSV template downloaded!', 'success')
   }
 
   const resetItemForm = () => {
@@ -681,9 +835,20 @@ export function EventPageClient({ event, initialItems }: Props) {
                   <span className="hidden sm:inline">Cards</span>
                 </button>
               </div>
-              <Button onClick={() => setShowAddModal(true)} icon={<Plus className="h-4 w-4" />}>
-                Add Item
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBulkUploadModal(true)} 
+                  icon={<Upload className="h-4 w-4" />}
+                >
+                  <span className="hidden sm:inline">Bulk Upload</span>
+                  <span className="sm:hidden">Upload</span>
+                </Button>
+                <Button onClick={() => setShowAddModal(true)} icon={<Plus className="h-4 w-4" />}>
+                  Add Item
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1145,6 +1310,137 @@ export function EventPageClient({ event, initialItems }: Props) {
               </Button>
             </div>
           </form>
+        </Modal>
+
+        {/* Bulk Upload Modal */}
+        <Modal
+          isOpen={showBulkUploadModal}
+          onClose={() => {
+            setShowBulkUploadModal(false)
+            setUploadFile(null)
+            setUploadResults(null)
+            setUploadProgress(0)
+          }}
+          title="Bulk Upload Items"
+          description="Upload multiple items at once from a CSV file"
+          size="lg"
+        >
+          <div className="space-y-6">
+            {/* Download Template */}
+            <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--secondary))]/30 p-4">
+              <p className="text-sm font-medium text-[rgb(var(--foreground))] mb-3">
+                Download template
+              </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <div className="flex flex-1 items-center gap-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-3">
+                  <FileSpreadsheet className="h-5 w-5 text-[rgb(var(--primary))] shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-[rgb(var(--foreground))]">Excel (.xlsx)</p>
+                    <p className="truncate text-xs text-[rgb(var(--muted-foreground))]">Category dropdown</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={downloadTemplateExcel} icon={<Download className="h-4 w-4" />}>
+                    Download
+                  </Button>
+                </div>
+                <div className="flex flex-1 items-center gap-3 rounded-lg border border-[rgb(var(--border))] bg-[rgb(var(--card))] p-3">
+                  <FileSpreadsheet className="h-5 w-5 text-[rgb(var(--muted-foreground))] shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-[rgb(var(--foreground))]">CSV (.csv)</p>
+                    <p className="truncate text-xs text-[rgb(var(--muted-foreground))]">Plain text format</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={downloadTemplateCSV} icon={<Download className="h-4 w-4" />}>
+                    Download
+                  </Button>
+                </div>
+              </div>
+              <p className="mt-3 text-center text-xs text-[rgb(var(--muted-foreground))]">
+                Need ideas?{' '}
+                <Link href="/ideas" className="font-medium text-[rgb(var(--primary))] hover:underline">
+                  AI Potluck Ideas →
+                </Link>
+              </p>
+            </div>
+
+            {/* File Upload */}
+            <div>
+              <label className="block text-sm font-medium text-[rgb(var(--foreground))] mb-2">
+                Upload CSV or Excel file
+              </label>
+              <div className="flex flex-col gap-3">
+                <input
+                  type="file"
+                  accept=".csv,.xlsx,.xls"
+                  onChange={handleFileSelect}
+                  className="block w-full text-sm text-[rgb(var(--foreground))] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-[rgb(var(--primary))] file:text-white hover:file:bg-[rgb(var(--primary))]/90 file:cursor-pointer cursor-pointer border border-[rgb(var(--border))] rounded-xl bg-[rgb(var(--card))] p-2"
+                />
+                {uploadFile && (
+                  <div className="flex items-center gap-2 text-sm text-[rgb(var(--muted-foreground))]">
+                    <Check className="h-4 w-4 text-emerald-400" />
+                    Selected: {uploadFile.name}
+                  </div>
+                )}
+              </div>
+              <p className="mt-2 text-xs text-[rgb(var(--muted-foreground))]">
+                CSV or Excel (.xlsx) • Category dropdown in Excel template • Max 100 items per upload
+              </p>
+            </div>
+
+            {/* Upload Results */}
+            {uploadResults && (
+              <div className="rounded-xl border border-[rgb(var(--border))] bg-[rgb(var(--secondary))]/30 p-4">
+                <h4 className="font-medium text-[rgb(var(--foreground))] mb-3">Upload Results</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-emerald-400">✓ Successfully added:</span>
+                    <span className="font-medium text-emerald-400">{uploadResults.success}</span>
+                  </div>
+                  {uploadResults.failed > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-[rgb(var(--destructive))]">✗ Failed:</span>
+                      <span className="font-medium text-[rgb(var(--destructive))]">{uploadResults.failed}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {uploadResults.errors.length > 0 && (
+                  <div className="mt-3 max-h-32 overflow-y-auto rounded-lg bg-[rgb(var(--card))] p-3">
+                    <p className="text-xs font-medium text-[rgb(var(--destructive))] mb-2">Errors:</p>
+                    {uploadResults.errors.map((error, i) => (
+                      <p key={i} className="text-xs text-[rgb(var(--muted-foreground))] mb-1">
+                        {error}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => {
+                  setShowBulkUploadModal(false)
+                  setUploadFile(null)
+                  setUploadResults(null)
+                }}
+              >
+                {uploadResults ? 'Close' : 'Cancel'}
+              </Button>
+              {!uploadResults && (
+                <Button
+                  className="flex-1"
+                  onClick={handleBulkUpload}
+                  loading={loading}
+                  disabled={!uploadFile}
+                  icon={<Upload className="h-4 w-4" />}
+                >
+                  Upload Items
+                </Button>
+              )}
+            </div>
+          </div>
         </Modal>
 
         {/* QR Code Download Modal */}

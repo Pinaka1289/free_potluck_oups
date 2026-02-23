@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Menu, X, ChefHat, User, LogOut, LayoutDashboard } from 'lucide-react'
+import { Menu, X, ChefHat, User, LogOut, LayoutDashboard, Shield } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import { Button } from '@/components/ui/Button'
 import { cn } from '@/lib/utils'
@@ -17,23 +17,56 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const supabase = createClient()
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      // getSession() is instant (cache). Only validate with getUser() when a session exists.
+      const { data: { session } } = await supabase.auth.getSession()
+      const sessionUser = session?.user ?? null
+      setUser(sessionUser)
+      if (!sessionUser) { setIsAdmin(false); return }
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        setUser(user ?? null)
+        if (user) {
+          const { data: profile } = await supabase
+            .from('potluckpartys_profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single()
+          setIsAdmin((profile as { is_admin?: boolean } | null)?.is_admin === true)
+        } else {
+          setIsAdmin(false)
+        }
+      } catch {
+        setUser(null)
+        setIsAdmin(false)
+      }
     }
 
     getUser()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null)
+      
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('potluckpartys_profiles')
+          .select('is_admin')
+          .eq('id', session.user.id)
+          .single()
+        setIsAdmin((profile as { is_admin?: boolean } | null)?.is_admin === true)
+      } else {
+        setIsAdmin(false)
+      }
     })
 
     return () => subscription.unsubscribe()
-  }, [supabase.auth])
+  }, [supabase.auth, supabase])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,6 +86,8 @@ export function Header() {
   const navLinks = [
     { href: '/', label: 'Home' },
     { href: '/create', label: 'Create Event' },
+    { href: '/ideas', label: 'AI Potluck Ideas' },
+    { href: '/recipes', label: 'AI Recipe Generator' },
   ]
 
   return (
@@ -128,6 +163,16 @@ export function Header() {
                           <LayoutDashboard className="h-4 w-4" />
                           Dashboard
                         </Link>
+                        {isAdmin && (
+                          <Link
+                            href="/admin"
+                            onClick={() => setShowUserMenu(false)}
+                            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--secondary))]"
+                          >
+                            <Shield className="h-4 w-4" />
+                            Admin Panel
+                          </Link>
+                        )}
                         <button
                           onClick={handleSignOut}
                           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-[rgb(var(--destructive))] transition-colors hover:bg-[rgb(var(--secondary))]"
@@ -194,6 +239,15 @@ export function Header() {
                   >
                     Dashboard
                   </Link>
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setIsOpen(false)}
+                      className="block rounded-lg px-4 py-3 text-base font-medium text-[rgb(var(--primary))] transition-colors hover:bg-[rgb(var(--secondary))]"
+                    >
+                      Admin Panel
+                    </Link>
+                  )}
                   <button
                     onClick={() => {
                       handleSignOut()
